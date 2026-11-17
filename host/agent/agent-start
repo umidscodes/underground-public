@@ -68,10 +68,27 @@ fi
   exit 69
 }
 
-# A new clone gets one checkout so that it has files and an index; after that, only its HEAD moves.
+# A new clone gets one checkout so that it has files and an index. No session works in the clone itself.
 if [[ -n $new_clone ]]; then
   git checkout -q --detach "$base" || die "the new clone of $UG_REPO cannot check out $base; is that repository empty?"
-else
-  git update-ref --no-deref HEAD "$base" || die "the clone of $UG_REPO cannot point its HEAD at $base; is that repository empty?"
 fi
+
+# Each session starts in a fresh worktree at the current base, so no stale file of an earlier session
+# carries into it. The name of a worktree starts with its start time, so names sort by age.
+trees=$HOME/work/.wt/$UG_REPO
+stamp=$(/bin/date +%Y%m%d-%H%M%S)-$$
+cutoff=$(/bin/date -v-1d +%Y%m%d-%H%M%S)
+mkdir -p "$trees"
+for old in "$trees"/*; do
+  [[ -d $old ]] || continue
+  # A worktree goes only when it is older than a day, has no changes, and has no commit that is not on GitHub.
+  [[ ${old##*/} < "$cutoff" ]] || continue
+  [[ -z $(git -C "$old" status --porcelain 2>/dev/null) ]] || continue
+  [[ -z $(git -C "$old" rev-list -n 1 HEAD --not --remotes 2>/dev/null) ]] || continue
+  git worktree remove "$old" >/dev/null 2>&1 || true
+done
+git worktree prune
+git -c core.hooksPath=/dev/null worktree add -q --detach "$trees/$stamp" "$base" ||
+  die "cannot make a worktree of $UG_REPO at $base in $trees/$stamp"
+cd "$trees/$stamp"
 start_omp "$@"
