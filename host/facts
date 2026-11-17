@@ -5,6 +5,6 @@ agent_home=/Users/ugagent
 auth_user=ugauth
 auth_home=/Users/ugauth
 agent_sshd_port=2222
-auth_broker_port=8765
+auth_broker_port=8767
 usage_broker_port=18765
 gateway_port=4000
